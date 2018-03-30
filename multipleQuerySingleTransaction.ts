@@ -14,9 +14,9 @@ var pool = mysql.createPool('mysql://localhost');
 
 var queries:{sql:string, values?:any}[] = [];
 
-queries[0] = 'INSERT INTO dbo.foo (bar) VALUES (?)';
-queries[1] = 'INSERT INTO dbo.foo (bar) VALUES (?)';
-queries[2] = 'INSERT INTO dbo.foo (bar) VALUES (?)';
+queries[0] = {sql:'INSERT INTO dbo.foo (bar) VALUES (?)', values:[0]};
+queries[1] = {sql:'INSERT INTO dbo.foo (bar) VALUES (?)', values:[1]};
+queries[2] = {sql:'INSERT INTO dbo.foo (bar) VALUES (?)', values:[2]};
 
 const results = await multipleQueryTransaction(pool, queries);
 
@@ -25,7 +25,7 @@ function multipleQueryTransaction(pool:any, queries: {sql:string | QueryOptions,
     pool.getConnection((err,conn) => {
       conn.beginTransaction((err)=>{
 
-        this.execMultiQuery(conn, queries,function(err:any, results:any) {
+        this.execMultiQuery(conn, queries, (err:any, results:any) => {
 
           // if any one of queries fail, rollback and reject promise with SQL error
           if (err) {
@@ -55,25 +55,17 @@ function multipleQueryTransaction(pool:any, queries: {sql:string | QueryOptions,
     let e:any;
 
     for(let i = 0; i < queries.length; ++i) {
-      allResults.push(new Promise(resolve => {
-        conn.query(queries[i].sql, queries[i].values, function(err:any, res:any) {
-          if (err) {e = err;}
+      allResults.push(new Promise((resolve, reject) => {
+        conn.query(queries[i].sql, queries[i].values, (err:any, res:any) => {
+          if (err) {reject(err);}
           resolve(res);
         })
       }))
     }
 
     //wait for all DB queries to finish
-    Promise.all(allResults).then(function(values) {
-      //the last SQL error will be stored in e.  return to callback
-      //else return the array of results
-      if(e) {
-        return next(e);
-      }
-      else {
-        return next(null, values);
-      }
-
-    })
+    Promise.all(allResults)
+      .then((values) => {return next(null, values)})
+      .catch((err) => {return next(err, null)});
   }
 
