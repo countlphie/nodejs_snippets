@@ -1,13 +1,3 @@
-/*
-
-Code for creating a pool connection with mysql library
-
-Executes multiple SQL queries in one transaction and rolls back if one or more fail
-
-Populate an object array with sql strings and corresponding values array
-
-*/
-
 var mysql = require('mysql');
 
 var pool = mysql.createPool('mysql://localhost');
@@ -49,23 +39,22 @@ function multipleQueryTransaction(pool:any, queries: {sql:string | QueryOptions,
     });
   })
 }
+function execMultiQuery(conn:any, queries: {sql:string | QueryOptions, values?:any}[], next:any) {
+  let allResults:any = [];
+  let e:any;
 
-  private execMultiQuery(conn:any, queries: {sql:string | QueryOptions, values?:any}[], next:any) {
-    let allResults:any = [];
-    let e:any;
-
-    for(let i = 0; i < queries.length; ++i) {
-      allResults.push(new Promise((resolve, reject) => {
-        conn.query(queries[i].sql, queries[i].values, (err:any, res:any) => {
-          if (err) {reject(err);}
-          resolve(res);
-        })
-      }))
-    }
+  for(let i = 0; i < queries.length; ++i) {
+    allResults.push(new Promise((resolve, reject) => {
+      conn.query(queries[i].sql, queries[i].values, (err:any, res:any) => {
+        if (err) {reject(err);}
+        resolve(res);
+      })
+    }))
+  }
 
     //wait for all DB queries to finish
-    Promise.all(allResults)
-      .then((values) => {return next(null, values)})
-      .catch((err) => {return next(err, null)});
-  }
+  Promise.all(allResults)
+    .then((values) => {return next(null, values)})
+    .catch((err) => {return next(err, null)});
+}
 
